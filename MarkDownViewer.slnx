@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="MarkDownViewer/MarkDownViewer.Client/MarkDownViewer.Client.csproj" />
+  <Project Path="MarkDownViewer/MarkDownViewer/MarkDownViewer.csproj" />
+</Solution>

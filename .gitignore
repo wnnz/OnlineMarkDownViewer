@@ -1,0 +1,6 @@
+/.dotnet
+/.vs
+MarkDownViewer/MarkDownViewer.Client/obj
+MarkDownViewer/MarkDownViewer/obj
+MarkDownViewer/MarkDownViewer.Client/bin
+MarkDownViewer/MarkDownViewer/bin
