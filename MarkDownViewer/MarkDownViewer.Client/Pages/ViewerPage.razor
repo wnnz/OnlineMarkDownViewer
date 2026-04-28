@@ -408,7 +408,7 @@ _scrollElement, _dotNetReference);
             _currentDocument = await ApiClient.GetDocumentAsync(sourceId, relativePath);
             _renderedMarkdown = MarkdownRenderer.Render(_currentDocument.Content);
             _pendingMarkdownRefresh = true;
-            _showToc = true;
+            _showToc = false;
 
             var parentPath = GetParentPath(relativePath);
             if (CurrentSource is not null && (!_isSearchMode || _currentDirectory?.CurrentPath != parentPath))
