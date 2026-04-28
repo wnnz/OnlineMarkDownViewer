@@ -1,3 +1,12 @@
 {
-  "sources": []
+  "sources": [
+    {
+      "id": "default-local-docs",
+      "name": "默认文档源",
+      "kind": "Local",
+      "localPath": "C:\\Files\\Codes\\OnlineMarkDownViewer\\MarkDownViewer\\MarkDownViewer\\data\\default-docs",
+      "pullIntervalMinutes": 30,
+      "gitAuthMode": "None"
+    }
+  ]
 }

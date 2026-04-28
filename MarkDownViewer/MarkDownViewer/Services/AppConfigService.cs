@@ -17,12 +17,16 @@ public sealed class AppConfigService
 
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly string _configPath;
+    private readonly DefaultDocumentSourceBootstrapService _defaultDocumentSourceBootstrapService;
 
-    public AppConfigService(IHostEnvironment hostEnvironment)
+    public AppConfigService(
+        IHostEnvironment hostEnvironment,
+        DefaultDocumentSourceBootstrapService defaultDocumentSourceBootstrapService)
     {
         var dataDirectory = Path.Combine(hostEnvironment.ContentRootPath, "data");
         Directory.CreateDirectory(dataDirectory);
         _configPath = Path.Combine(dataDirectory, "config.json");
+        _defaultDocumentSourceBootstrapService = defaultDocumentSourceBootstrapService;
     }
 
     public async Task<AppConfigDto> GetAsync(CancellationToken cancellationToken = default)
@@ -30,16 +34,32 @@ public sealed class AppConfigService
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            if (!File.Exists(_configPath))
+            var configFileExists = File.Exists(_configPath);
+            AppConfigDto config;
+
+            if (!configFileExists)
             {
-                var empty = new AppConfigDto();
-                await WriteCoreAsync(empty, cancellationToken);
-                return empty;
+                config = new AppConfigDto();
+            }
+            else
+            {
+                await using var stream = File.OpenRead(_configPath);
+                config = await JsonSerializer.DeserializeAsync<AppConfigDto>(stream, JsonOptions, cancellationToken) ?? new AppConfigDto();
             }
 
-            await using var stream = File.OpenRead(_configPath);
-            var config = await JsonSerializer.DeserializeAsync<AppConfigDto>(stream, JsonOptions, cancellationToken) ?? new AppConfigDto();
-            return Normalize(config);
+            // 首次启动时自动生成默认文档源和示例文档，方便开箱即用。
+            var bootstrapResult = await _defaultDocumentSourceBootstrapService.EnsureInitializedAsync(
+                config,
+                configFileExists,
+                cancellationToken);
+
+            var normalized = Normalize(bootstrapResult.Config);
+            if (!configFileExists || bootstrapResult.Changed)
+            {
+                await WriteCoreAsync(normalized, cancellationToken);
+            }
+
+            return normalized;
         }
         finally
         {

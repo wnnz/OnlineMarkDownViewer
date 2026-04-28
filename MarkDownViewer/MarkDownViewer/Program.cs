@@ -19,6 +19,7 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddSingleton<TokenService>();
 builder.Services.AddSingleton<AppConfigService>();
+builder.Services.AddSingleton<DefaultDocumentSourceBootstrapService>();
 builder.Services.AddSingleton<GitSyncService>();
 builder.Services.AddSingleton<DocumentLibraryService>();
 builder.Services.AddSingleton<StaticWebAssetManifestService>();
