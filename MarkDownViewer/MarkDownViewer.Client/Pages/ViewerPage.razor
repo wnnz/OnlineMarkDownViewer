@@ -7,199 +7,261 @@
 
 <PageTitle>MD Viewer</PageTitle>
 
-<div class="viewer-shell">
-    <header class="viewer-header glass-panel">
-        <div class="brand-block">
-            <div class="brand-mark">MD</div>
-            <div>
-                <span class="panel-kicker">在线文档查看器</span>
-                <h1>MD Viewer</h1>
+<div class="is-flex is-flex-direction-column has-background-white-ter" style="height: 100vh; overflow: hidden;">
+    <nav class="navbar is-white mb-0 py-2" role="navigation" aria-label="main navigation"
+         style="z-index: 10; border-bottom: 1px solid rgba(0,0,0,0.04); background: linear-gradient(90deg, #ffffff 0%, #fdfbfb 100%);">
+        <div class="navbar-brand">
+            <div class="navbar-item px-5 is-flex is-align-items-center">
+                <div class="is-flex is-align-items-center is-justify-content-center has-background-primary has-text-white mr-3" style="width: 36px; height: 36px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0, 209, 178, 0.3);">
+                    <i class="fas fa-book-open"></i>
+                </div>
+                <span class="has-text-weight-bold is-size-4 has-text-dark" style="letter-spacing: -0.5px;">MD Viewer</span>
+                <span class="tag is-primary is-light ml-3 is-rounded has-text-weight-medium">在线文档查看器</span>
             </div>
         </div>
 
-        <div class="header-actions">
-            @if (CurrentSource is not null && CurrentSource.Kind == DocumentSourceKind.Git)
-            {
-                <button class="ghost-button" type="button" disabled="@_isSyncing" @onclick="SyncCurrentSourceAsync">@(
-                    _isSyncing ? "同步中..." : "立即同步")</button>
-                }
-                <button class="icon-button" type="button" @onclick="OpenConfigModal" aria-label="系统配置">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path
-                        d="M12 8.6A3.4 3.4 0 1 0 12 15.4A3.4 3.4 0 1 0 12 8.6zM20.2 13.2V10.8L17.9 10C17.7 9.4 17.4 8.8 17.1 8.3L18.2 6.1L16.5 4.4L14.3 5.5C13.8 5.2 13.2 4.9 12.6 4.7L11.8 2.4H9.4L8.6 4.7C8 4.9 7.4 5.2 6.9 5.5L4.7 4.4L3 6.1L4.1 8.3C3.8 8.8 3.5 9.4 3.3 10L1 10.8V13.2L3.3 14C3.5 14.6 3.8 15.2 4.1 15.7L3 17.9L4.7 19.6L6.9 18.5C7.4 18.8 8 19.1 8.6 19.3L9.4 21.6H11.8L12.6 19.3C13.2 19.1 13.8 18.8 14.3 18.5L16.5 19.6L18.2 17.9L17.1 15.7C17.4 15.2 17.7 14.6 17.9 14L20.2 13.2Z" />
-                    </svg>
-                </button>
-                <span class="user-chip">@AuthService.CurrentUserName</span>
-                <button class="ghost-button danger" type="button" @onclick="LogoutAsync">退出</button>
+        <div class="navbar-menu is-active">
+            <div class="navbar-end pr-5">
+                <div class="navbar-item">
+                    <div class="buttons">
+                        @if (CurrentSource is not null && CurrentSource.Kind == DocumentSourceKind.Git)
+                        {
+                            <button class="button is-info is-light is-small is-rounded has-text-weight-medium" type="button" disabled="@_isSyncing"
+                                    @onclick="SyncCurrentSourceAsync" style="transition: all 0.3s; border: none; box-shadow: 0 2px 6px rgba(50, 152, 220, 0.15);">
+                                @(_isSyncing ? "同步中..." : "立即同步")
+                            </button>
+                        }
+                        <button class="button is-primary is-small is-rounded has-text-weight-medium" type="button" @onclick="OpenConfigModal"
+                                aria-label="系统配置" style="transition: all 0.3s; padding: 0 16px; box-shadow: 0 4px 10px rgba(0, 209, 178, 0.2);">
+                            <span class="icon is-small"><i class="fas fa-cog"></i></span>
+                            <span>系统配置</span>
+                        </button>
+                        <div class="is-flex is-align-items-center ml-2 pl-3" style="border-left: 1px solid #eee;">
+                            <span class="tag is-dark is-light is-medium is-rounded has-text-weight-semibold">@AuthService.CurrentUserName</span>
+                            <button class="button is-danger is-light is-small is-rounded ml-2" type="button"
+                                    @onclick="LogoutAsync" style="border: none;">退出</button>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </header>
+        </div>
+    </nav>
 
-        @if (!string.IsNullOrWhiteSpace(_noticeMessage))
-        {
-            <div class="@($"notice-banner {(_noticeIsError ? "error" : "success")}")">@_noticeMessage</div>
-        }
+    @if (!string.IsNullOrWhiteSpace(_noticeMessage))
+    {
+        <div class="notification @(_noticeIsError ? "is-danger" : "is-info") is-light is-radiusless mb-0 py-2 px-4 is-size-7 shadow-sm">
+            <button class="delete" @onclick='() => ShowNotice("", false)'></button>
+            @_noticeMessage
+        </div>
+    }
 
-        <div class="viewer-body">
-            <aside class="viewer-sidebar glass-panel">
-                <section class="sidebar-section">
-                    <span class="panel-kicker">文档源</span>
-                    <label class="select shell-select">
-                        <select value="@SelectedSourceId" @onchange="OnSourceChangedAsync">
-                            <option value="">请选择文档源</option>
-                            @foreach (var source in _config.Sources)
-                            {
-                                <option value="@source.Id">@source.Name</option>
-                            }
-                        </select>
-                    </label>
-                </section>
+    <div class="columns is-gapless is-flex-grow-1 mx-4 mt-4 mb-4" style="height: calc(100vh - 80px); gap: 1.5rem;">
+        <aside class="column is-3 p-0 is-flex is-flex-direction-column my-0"
+               style="max-width: 320px; box-shadow: 0 10px 25px rgba(0,0,0,0.03); border-radius: 16px; border: 1px solid rgba(0,0,0,0.04); background: #ffffff;">
+            <div class="p-4"
+                 style="border-bottom: 1px solid rgba(0,0,0,0.04); background-color: #fafbfc; border-top-left-radius: 16px; border-top-right-radius: 16px;">
+                <div class="field">
+                    <label class="label is-small has-text-grey has-text-weight-bold" style="letter-spacing: 0.5px;">文档源</label>
+                    <div class="control">
+                        <div class="select is-fullwidth is-small is-primary">
+                            <select value="@SelectedSourceId" @onchange="OnSourceChangedAsync" style="border-radius: 8px; box-shadow: 0 2px 4px rgba(0,209,178,0.1); border-color: rgba(0,209,178,0.3);">
+                                <option value="">请选择文档源</option>
+                                @foreach (var source in _config.Sources)
+                                {
+                                    <option value="@source.Id">@source.Name</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </div>
 
-                <section class="sidebar-section">
-                    <span class="panel-kicker">快速搜索</span>
-                    <input class="input shell-input" value="@_searchText" @oninput="OnSearchChangedAsync"
-                           placeholder="按文件名或内容搜索..." />
-                </section>
+                <div class="field mt-4">
+                    <div class="control has-icons-left">
+                        <input class="input is-small is-rounded" value="@_searchText" @oninput="OnSearchChangedAsync"
+                               placeholder="搜索文档或内容..." style="box-shadow: inset 0 1px 3px rgba(0,0,0,0.02); background-color: #f4f6f8; border: none;" />
+                        <span class="icon is-small is-left has-text-grey">
+                            <i class="fas fa-search"></i>
+                        </span>
+                    </div>
+                </div>
 
-                <section class="sidebar-section">
-                    <span class="panel-kicker">当前位置</span>
-                    <nav class="breadcrumb-shell" aria-label="文档路径">
+                <nav class="breadcrumb is-small mt-4 mb-0 has-bullet-separator has-text-weight-medium" aria-label="breadcrumbs">
+                    <ul class="is-marginless">
                         @if (_currentDirectory is null)
                         {
-                            <span class="breadcrumb-pill muted">根目录</span>
-                        }
-                        else
-                        {
-                            @foreach (var crumb in _currentDirectory.Breadcrumbs)
-                            {
-                                <button class="breadcrumb-pill" type="button"
-                                        @onclick="() => NavigateToDirectoryAsync(crumb.RelativePath)">@crumb.Name</button>
+                            <li class="is-active"><a href="javascript:void(0)" aria-current="page"
+                                                         class="has-text-grey">根目录</a></li>
                             }
-                        }
+                        else
+                            {
+                                @foreach (var crumb in _currentDirectory.Breadcrumbs)
+                                {
+                                    <li>
+                                        <a href="javascript:void(0)" class="has-text-info has-text-weight-medium"
+                                           @onclick="() => NavigateToDirectoryAsync(crumb.RelativePath)">@crumb.Name</a>
+                                    </li>
+                                }
+                            }
+                        </ul>
                     </nav>
-                </section>
+                </div>
 
-                <section class="sidebar-section flex-fill">
-                    <div class="section-title-row">
-                        <span class="panel-kicker">@(_isSearchMode ? "搜索结果" : "文件列表")</span>
-                        @if (_isLoadingEntries)
-                        {
-                            <span class="tiny-tag">刷新中</span>
-                        }
-                    </div>
-
-                    @if (!_config.Sources.Any())
-                    {
-                        <div class="empty-state compact-empty">
-                            <h3>还没有配置文档源</h3>
-                            <p>打开右上角配置面板，新增本地目录或 Git 仓库后就能开始浏览。</p>
+                <div class="p-0 menu is-flex-grow-1"
+                     style="overflow-y: auto; background-color: #ffffff; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
+                    <div class="px-5 py-3 is-flex is-justify-content-space-between is-align-items-center"
+                         style="position: sticky; top: 0; z-index: 5; background-color: rgba(255,255,255,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(0,0,0,0.03);">
+                        <p class="menu-label mb-0 has-text-weight-bold has-text-primary" style="letter-spacing: 0.5px;">
+                            @(_isSearchMode ? "搜索结果" : "文件列表")
+                        </p>
+                            @if (_isLoadingEntries)
+                            {
+                                <span class="tag is-primary is-light is-rounded is-small">
+                                    <i class="fas fa-circle-notch fa-spin mr-1"></i> 加载中
+                                </span>
+                            }
                         </div>
-                    }
-                    else if (_visibleEntries.Count == 0)
+
+                        <div class="px-3 pb-4 pt-2">
+                            @if (!_config.Sources.Any())
+                            {
+                                <div class="notification is-warning is-light is-small mt-3 mx-2" style="border-radius: 12px;">
+                                    <strong>还没有配置文档源</strong><br />
+                                    请通过右上角添加来源。
+                                </div>
+                            }
+                            else if (_visibleEntries.Count == 0)
+                            {
+                                <div class="notification is-info is-light is-small mt-3 mx-2" style="border-radius: 12px; background-color: #f0f4f8; color: #4a5568;">
+                                    <strong>没有找到结果</strong><br />
+                                    @(_isSearchMode ? "试试更短的关键词。" : "当前目录是空的。")
+                                </div>
+                            }
+                            else
+                            {
+                                <ul class="menu-list">
+                                    <Virtualize Items="_visibleEntries" Context="entry" ItemSize="48">
+                                        <li>
+                                            <a class="@GetEntryClass(entry) is-flex is-align-items-center py-2 px-3 my-1"
+                                                   style="border-radius: 8px; transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);"
+                                                   @onclick="() => OpenEntryAsync(entry)">
+                                                <span
+                                                    class="tag @(entry.IsDirectory ? "is-warning is-light" : "is-primary is-light") mr-3 is-rounded has-text-weight-bold"
+                                                    style="width: 36px; height: 36px; font-size: 0.65rem; border: none; flex-shrink: 0;">
+                                                    @(entry.IsDirectory ? "📁" : "📄")
+                                                </span>
+                                                <div class="is-flex-grow-1 is-clipped" style="line-height: 1.4;">
+                                                    <div class="is-size-6 has-text-weight-semibold is-ellipsis"
+                                                         style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #2d3748;"
+                                                         title="@entry.Name">
+                                                        @((MarkupString)HighlightText(entry.Name))
+                                                    </div>
+                                                    @if (_isSearchMode && !string.IsNullOrWhiteSpace(entry.DisplayPath))
+                                                    {
+                                                        <div class="has-text-grey"
+                                                             style="font-size: 0.65rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"
+                                                             title="@entry.DisplayPath">
+                                                            @entry.DisplayPath
+                                                        </div>
+                                                    }
+                                                </div>
+                                                <div
+                                                    class="has-text-right ml-2 is-flex is-flex-direction-column is-align-items-flex-end">
+                                                    @if (entry.IsContentMatch)
+                                                    {
+                                                        <span class="tag is-danger is-light is-rounded mb-1"
+                                                              style="font-size: 0.6rem; padding: 0 4px; height: auto;">匹配</span>
+                                                    }
+                                                    @if (!entry.IsDirectory)
+                                                    {
+                                                        <span class="has-text-grey-light"
+                                                              style="font-size: 0.6rem;">@FormatBytes(entry.Size)</span>
+                                                    }
+                                                </div>
+                                            </a>
+                                        </li>
+                                    </Virtualize>
+                                </ul>
+                            }
+                        </div>
+                    </div>
+                </aside>
+
+                <section class="column p-0 is-flex is-flex-direction-column my-0"
+                         style="position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.03); border-radius: 16px; border: 1px solid rgba(0,0,0,0.04); background: #ffffff; overflow: hidden;">
+                    @if (_currentDocument is null)
                     {
-                        <div class="empty-state compact-empty">
-                            <h3>@(_isSearchMode ? "没有找到匹配结果" : "这个目录是空的")</h3>
-                            <p>@(_isSearchMode ? "试试更短的关键词，或者切换另一个文档源。" : "可以切换路径、切换文档源，或者通过配置面板添加更多来源。")</p>
+                        <div class="is-flex is-justify-content-center is-align-items-center" style="height: 100%; background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);">
+                            <div class="has-text-centered">
+                                <div class="mb-5 is-inline-block" style="background: white; border-radius: 50%; padding: 2.5rem; box-shadow: 0 15px 35px rgba(0,0,0,0.05), inset 0 0 0 1px rgba(0,0,0,0.05);">
+                                    <span class="has-text-primary" style="font-size: 4rem; line-height: 1;"><i class="fas fa-layer-group"></i></span>
+                                </div>
+                                <h2 class="title is-4 has-text-dark has-text-weight-bold" style="letter-spacing: -0.5px;">欢迎来到 MD Viewer</h2>
+                                <p class="is-size-6 has-text-grey mt-3" style="max-width: 320px; line-height: 1.6;">请从左侧选择文档开始阅读。系统原生支持 Markdown 解析、代码高亮和目录快速导航。</p>
+                                <div class="mt-5">
+                                    <span class="tag is-primary is-light is-rounded is-medium mx-1" style="font-weight: 500;">Markdown渲染</span>
+                                    <span class="tag is-info is-light is-rounded is-medium mx-1" style="font-weight: 500;">代码高亮</span>
+                                </div>
+                            </div>
                         </div>
                     }
                     else
                     {
-                        <div class="entry-list-shell">
-                            <Virtualize Items="_visibleEntries" Context="entry" ItemSize="74">
-                                <div class="@GetEntryClass(entry)">
-                                    <button class="entry-button" type="button" @onclick="() => OpenEntryAsync(entry)">
-                                        <div class="entry-icon">@(entry.IsDirectory ? "DIR" : "MD")</div>
-                                        <div class="entry-body">
-                                            <div class="entry-title-row">
-                                                <span class="entry-name">@((MarkupString)HighlightText(entry.Name))</span>
-                                                @if (entry.IsContentMatch)
-                                                {
-                                                    <span class="tiny-tag content-match">内容匹配</span>
-                                                }
-                                            </div>
-
-                                            @if (_isSearchMode && !string.IsNullOrWhiteSpace(entry.DisplayPath))
-                                            {
-                                                <div class="entry-path">@entry.DisplayPath</div>
-                                            }
-
-                                            <div class="entry-meta">
-                                                @if (!entry.IsDirectory)
-                                                {
-                                                    <span class="tiny-tag">@FormatBytes(entry.Size)</span>
-                                                }
-                                                <span
-                                                class="tiny-tag">@entry.ModifiedAt.LocalDateTime.ToString("yyyy-MM-dd")</span>
-                                            </div>
-                                        </div>
-                                    </button>
-                                </div>
-                            </Virtualize>
-                        </div>
-                    }
-                </section>
-            </aside>
-
-            <section class="viewer-content glass-panel">
-                @if (_currentDocument is null)
-                {
-                    <div class="empty-state content-empty">
-                        <span class="panel-kicker">阅读区</span>
-                        <h2>选择一个 Markdown 文件开始查看</h2>
-                        <p>左侧支持目录切换、路径导航和内容搜索。打开文档后，这里会自动生成章节导航和代码高亮。</p>
-                    </div>
-                }
-                else
-                {
-                    <div class="document-header">
-                        <div>
-                            <span class="panel-kicker">@_currentDocument.SourceName</span>
-                            <h2>@_currentDocument.Name</h2>
-                        </div>
-                        <div class="document-meta">
-                            <span class="tiny-tag">@FormatBytes(_currentDocument.Size)</span>
-                            <span class="tiny-tag">@_currentDocument.ModifiedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</span>
-                        </div>
-                    </div>
-
-                    <div class="toc-shell glass-panel">
-                        <button class="toc-toggle" type="button" @onclick="ToggleToc">
+                        <div class="px-6 py-4 is-flex is-justify-content-space-between is-align-items-center"
+                             style="border-bottom: 1px solid rgba(0,0,0,0.04); background-color: #ffffff; flex-shrink: 0;">
                             <div>
-                                <span class="panel-kicker">章节导航</span>
-                                <strong>@GetActiveHeadingTitle()</strong>
+                                <div class="is-flex is-align-items-center mb-2">
+                                    <span class="tag is-primary is-light is-rounded has-text-weight-bold"
+                                          style="font-size: 0.65rem; padding: 0 12px; letter-spacing: 0.5px;">@_currentDocument.SourceName</span>
+                                </div>
+                                <h2 class="title is-3 mb-0 has-text-dark" style="font-weight: 800; letter-spacing: -0.5px; color: #1a202c;">@_currentDocument.Name</h2>
                             </div>
-                            <span class="toc-toggle-icon">@(_showToc ? "收起" : "展开")</span>
-                        </button>
+                            <div
+                                class="text-right has-text-grey is-size-7 is-flex is-flex-direction-column is-align-items-flex-end is-hidden-mobile">
+                                <span class="mb-2 tag is-white shadow-sm is-rounded" style="border: 1px solid #f0f0f0;">大小: @FormatBytes(_currentDocument.Size)</span>
+                                <span class="tag is-white shadow-sm is-rounded has-text-grey-light" style="border: 1px solid #f0f0f0;">
+                                    <i class="far fa-clock mr-1"></i> @_currentDocument.ModifiedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</span>
+                                </div>
+                            </div>
 
-                        @if (_showToc)
-                        {
-                            <div class="toc-list">
-                                @if (_headings.Count == 0)
+                            <div class="is-flex is-flex-grow-1"
+                                 style="overflow: hidden; background-color: #fafbfc;">
+                                <div class="p-6 is-flex-grow-1" style="overflow-y: auto; background-color: #ffffff;" @ref="_scrollElement">
+                                    <article class="content markdown-body" style="max-width: 860px; margin: 0 auto;"
+                                             @ref="_markdownElement">
+                                        @_renderedMarkdown
+                                    </article>
+                                </div>
+
+                                @if (_headings.Count > 0)
                                 {
-                                    <div class="toc-empty">当前文档没有检测到二级及以上标题。</div>
-                                }
-                                else
-                                {
-                                    @foreach (var heading in _headings)
-                                    {
-                                        <button class="@GetHeadingClass(heading)" type="button"
-                                                @onclick="() => ScrollToHeadingAsync(heading.Id)">
-                                            @heading.Text
-                                        </button>
-                                    }
+                                    <div class="is-flex is-flex-direction-column"
+                                         style="width: 280px; border-left: 1px solid rgba(0,0,0,0.04); background: #fdfdfd; flex-shrink: 0; box-shadow: -4px 0 15px rgba(0,0,0,0.01);">
+                                        <div class="px-5 py-4 is-flex is-align-items-center"
+                                             style="border-bottom: 1px solid rgba(0,0,0,0.04); background: #ffffff;">
+                                            <span class="has-text-weight-bold is-size-6 has-text-primary" style="letter-spacing: 0.5px;">目录导航</span>
+                                        </div>
+                            
+                                        <div class="p-4 menu" style="overflow-y: auto; flex: 1;">
+                                            <ul class="menu-list is-size-7" style="line-height: 1.6;">
+                                                @foreach (var heading in _headings)
+                                                {
+                                                    <li>
+                                                        <a class="@GetHeadingClass(heading) py-2 mb-1"
+                                                               style="padding-left: @(0.5 + (heading.Level - 1) * 0.8)rem; border-radius: 8px; transition: all 0.25s;"
+                                                               @onclick="() => ScrollToHeadingAsync(heading.Id)">
+                                                            @heading.Text
+                                                        </a>
+                                                    </li>
+                                                }
+                                            </ul>
+                                        </div>
+                                    </div>
                                 }
                             </div>
                         }
-                    </div>
-
-                    <div class="markdown-scroll" @ref="_scrollElement">
-                        <article class="markdown-stage markdown-body" @ref="_markdownElement">
-                            @_renderedMarkdown
-                        </article>
-                    </div>
-                }
-            </section>
-        </div>
-    </div>
+                    </section>
+                </div>
+            </div>
 
 <ConfigModal Visible="@_showConfigModal" Model="@_editingConfig" IsSaving="@_isSavingConfig" OnClose="CloseConfigModal"
              OnSave="SaveConfigAsync" />
@@ -235,7 +297,6 @@
     private bool _isSavingConfig;
     private bool _isSyncing;
     private bool _showConfigModal;
-    private bool _showToc;
     private bool _pendingMarkdownRefresh;
 
     protected override async Task OnInitializedAsync()
@@ -257,7 +318,6 @@
 _scrollElement, _dotNetReference);
             _headings.Clear();
             _headings.AddRange(headings.Where(item => item.Level >= 2));
-            _showToc = _headings.Count > 0 && _showToc;
             StateHasChanged();
         }
     }
@@ -408,7 +468,6 @@ _scrollElement, _dotNetReference);
             _currentDocument = await ApiClient.GetDocumentAsync(sourceId, relativePath);
             _renderedMarkdown = MarkdownRenderer.Render(_currentDocument.Content);
             _pendingMarkdownRefresh = true;
-            _showToc = false;
 
             var parentPath = GetParentPath(relativePath);
             if (CurrentSource is not null && (!_isSearchMode || _currentDirectory?.CurrentPath != parentPath))
@@ -508,11 +567,8 @@ _config.Sources.FirstOrDefault();
 
     private async Task ScrollToHeadingAsync(string headingId)
     {
-        _showToc = false;
         await JS.InvokeVoidAsync("mdViewerUi.scrollToHeading", _scrollElement, headingId);
     }
-
-    private void ToggleToc() => _showToc = !_showToc;
 
     private async Task RunGuardedAsync(Func<Task> action, string title)
     {
@@ -576,13 +632,15 @@ _config.Sources.FirstOrDefault();
     private string GetEntryClass(DirectoryEntryDto entry)
     {
         var selected = _currentDocument?.RelativePath == entry.RelativePath;
-        return selected ? "entry-row active" : "entry-row";
+        return selected ? "is-active has-background-white box shadow-sm has-text-info-dark has-text-weight-bold" :
+"has-text-grey-dark";
     }
 
     private string GetHeadingClass(HeadingItem heading)
     {
         var active = string.Equals(_activeHeadingId, heading.Id, StringComparison.Ordinal);
-        return active ? $"toc-item active level-{heading.Level}" : $"toc-item level-{heading.Level}";
+        return active ? "is-active has-background-white box shadow-sm has-text-info-dark has-text-weight-bold" :
+"has-text-grey-dark";
     }
 
     private string GetActiveHeadingTitle()
