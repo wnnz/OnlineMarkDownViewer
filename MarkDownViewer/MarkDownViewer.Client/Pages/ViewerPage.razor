@@ -8,200 +8,239 @@
 <PageTitle>MD Viewer</PageTitle>
 
 <div class="viewer-shell">
-    <header class="viewer-header glass-panel">
-        <div class="brand-block">
-            <div class="brand-mark">MD</div>
-            <div>
-                <span class="panel-kicker">在线文档查看器</span>
-                <h1>MD Viewer</h1>
+    <section class="box viewer-topbar">
+        <div class="columns is-vcentered is-variable is-4 is-mobile is-multiline mb-0">
+            <div class="column">
+                <div class="media">
+                    <div class="media-left">
+                        <div class="viewer-brand-badge">MD</div>
+                    </div>
+                    <div class="media-content">
+                        <p class="title is-4 mb-1">MD Viewer</p>
+                        <p class="subtitle is-6 mb-0">Bulma 驱动的在线 Markdown 工作台</p>
+                    </div>
+                </div>
+            </div>
+            <div class="column is-narrow">
+                <div class="buttons are-small viewer-topbar-actions">
+                    @if (CurrentSource is not null && CurrentSource.Kind == DocumentSourceKind.Git)
+                    {
+                        <button class="button is-link is-light" type="button" disabled="@_isSyncing" @onclick="SyncCurrentSourceAsync">
+                            @(_isSyncing ? "同步中..." : "立即同步")
+                        </button>
+                    }
+                    <button class="button is-primary is-light" type="button" @onclick="OpenConfigModal">
+                        系统配置
+                    </button>
+                    <span class="tag is-info is-light is-medium">@AuthService.CurrentUserName</span>
+                    <button class="button is-danger is-light" type="button" @onclick="LogoutAsync">
+                        退出
+                    </button>
+                </div>
             </div>
         </div>
+    </section>
 
-        <div class="header-actions">
-            @if (CurrentSource is not null && CurrentSource.Kind == DocumentSourceKind.Git)
-            {
-                <button class="ghost-button" type="button" disabled="@_isSyncing" @onclick="SyncCurrentSourceAsync">@(
-                    _isSyncing ? "同步中..." : "立即同步")</button>
-                }
-                <button class="icon-button" type="button" @onclick="OpenConfigModal" aria-label="系统配置">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path
-                        d="M12 8.6A3.4 3.4 0 1 0 12 15.4A3.4 3.4 0 1 0 12 8.6zM20.2 13.2V10.8L17.9 10C17.7 9.4 17.4 8.8 17.1 8.3L18.2 6.1L16.5 4.4L14.3 5.5C13.8 5.2 13.2 4.9 12.6 4.7L11.8 2.4H9.4L8.6 4.7C8 4.9 7.4 5.2 6.9 5.5L4.7 4.4L3 6.1L4.1 8.3C3.8 8.8 3.5 9.4 3.3 10L1 10.8V13.2L3.3 14C3.5 14.6 3.8 15.2 4.1 15.7L3 17.9L4.7 19.6L6.9 18.5C7.4 18.8 8 19.1 8.6 19.3L9.4 21.6H11.8L12.6 19.3C13.2 19.1 13.8 18.8 14.3 18.5L16.5 19.6L18.2 17.9L17.1 15.7C17.4 15.2 17.7 14.6 17.9 14L20.2 13.2Z" />
-                    </svg>
-                </button>
-                <span class="user-chip">@AuthService.CurrentUserName</span>
-                <button class="ghost-button danger" type="button" @onclick="LogoutAsync">退出</button>
-            </div>
-        </header>
+    @if (!string.IsNullOrWhiteSpace(_noticeMessage))
+    {
+        <div class="@GetNoticeClass()">
+            @_noticeMessage
+        </div>
+    }
 
-        @if (!string.IsNullOrWhiteSpace(_noticeMessage))
-        {
-            <div class="@($"notice-banner {(_noticeIsError ? "error" : "success")}")">@_noticeMessage</div>
-        }
-
-        <div class="viewer-body">
-            <aside class="viewer-sidebar glass-panel">
-                <section class="sidebar-section">
-                    <span class="panel-kicker">文档源</span>
-                    <label class="select shell-select">
-                        <select value="@SelectedSourceId" @onchange="OnSourceChangedAsync">
-                            <option value="">请选择文档源</option>
-                            @foreach (var source in _config.Sources)
-                            {
-                                <option value="@source.Id">@source.Name</option>
-                            }
-                        </select>
-                    </label>
-                </section>
-
-                <section class="sidebar-section">
-                    <span class="panel-kicker">快速搜索</span>
-                    <input class="input shell-input" value="@_searchText" @oninput="OnSearchChangedAsync"
-                           placeholder="按文件名或内容搜索..." />
-                </section>
-
-                <section class="sidebar-section">
-                    <span class="panel-kicker">当前位置</span>
-                    <nav class="breadcrumb-shell" aria-label="文档路径">
-                        @if (_currentDirectory is null)
-                        {
-                            <span class="breadcrumb-pill muted">根目录</span>
-                        }
-                        else
-                        {
-                            @foreach (var crumb in _currentDirectory.Breadcrumbs)
-                            {
-                                <button class="breadcrumb-pill" type="button"
-                                        @onclick="() => NavigateToDirectoryAsync(crumb.RelativePath)">@crumb.Name</button>
-                            }
-                        }
-                    </nav>
-                </section>
-
-                <section class="sidebar-section flex-fill">
-                    <div class="section-title-row">
-                        <span class="panel-kicker">@(_isSearchMode ? "搜索结果" : "文件列表")</span>
-                        @if (_isLoadingEntries)
-                        {
-                            <span class="tiny-tag">刷新中</span>
-                        }
+    <div class="viewer-layout">
+        <aside class="viewer-sidebar">
+            <div class="box viewer-sidebar-box">
+                <div class="field">
+                    <label class="label">文档源</label>
+                    <div class="control">
+                        <div class="select is-fullwidth is-link">
+                            <select value="@SelectedSourceId" @onchange="OnSourceChangedAsync">
+                                <option value="">请选择文档源</option>
+                                @foreach (var source in _config.Sources)
+                                {
+                                    <option value="@source.Id">@source.Name</option>
+                                }
+                            </select>
+                        </div>
                     </div>
+                </div>
 
+                <div class="field mb-0">
+                    <label class="label">搜索</label>
+                    <div class="control has-icons-left">
+                        <input class="input is-link" value="@_searchText" @oninput="OnSearchChangedAsync" placeholder="按文件名或内容搜索..." />
+                        <span class="icon is-left">
+                            <span>⌕</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="panel is-link viewer-file-panel">
+                <p class="panel-heading">
+                    <span>@(_isSearchMode ? "搜索结果" : "文件列表")</span>
+                    @if (_isLoadingEntries)
+                    {
+                        <span class="tag is-light is-info ml-2">刷新中</span>
+                    }
+                </p>
+
+                <div class="panel-block is-block viewer-breadcrumb-block">
+                    <p class="is-size-7 has-text-weight-semibold has-text-grey mb-2">当前位置</p>
+                    <nav class="breadcrumb is-small has-arrow-separator mb-0" aria-label="文档路径">
+                        <ul>
+                            @if (_currentDirectory is null)
+                            {
+                                <li class="is-active"><a>根目录</a></li>
+                            }
+                            else
+                            {
+                                @foreach (var crumb in _currentDirectory.Breadcrumbs)
+                                {
+                                    <li class="@(crumb == _currentDirectory.Breadcrumbs.Last() ? "is-active" : null)">
+                                        <a href="" @onclick:preventDefault="true" @onclick="() => NavigateToDirectoryAsync(crumb.RelativePath)">@crumb.Name</a>
+                                    </li>
+                                }
+                            }
+                        </ul>
+                    </nav>
+                </div>
+
+                <div class="panel-block is-block viewer-panel-scroll">
                     @if (!_config.Sources.Any())
                     {
-                        <div class="empty-state compact-empty">
-                            <h3>还没有配置文档源</h3>
-                            <p>打开右上角配置面板，新增本地目录或 Git 仓库后就能开始浏览。</p>
-                        </div>
+                        <article class="message is-info is-light mb-0">
+                            <div class="message-body">
+                                还没有配置文档源。点击右上角“系统配置”即可添加本地目录或 Git 仓库。
+                            </div>
+                        </article>
                     }
                     else if (_visibleEntries.Count == 0)
                     {
-                        <div class="empty-state compact-empty">
-                            <h3>@(_isSearchMode ? "没有找到匹配结果" : "这个目录是空的")</h3>
-                            <p>@(_isSearchMode ? "试试更短的关键词，或者切换另一个文档源。" : "可以切换路径、切换文档源，或者通过配置面板添加更多来源。")</p>
-                        </div>
+                        <article class="message is-warning is-light mb-0">
+                            <div class="message-body">
+                                @(_isSearchMode ? "没有找到匹配结果，试试更短的关键词。" : "当前目录为空，可以切换路径或添加更多文档源。")
+                            </div>
+                        </article>
                     }
                     else
                     {
-                        <div class="entry-list-shell">
-                            <Virtualize Items="_visibleEntries" Context="entry" ItemSize="74">
-                                <div class="@GetEntryClass(entry)">
-                                    <button class="entry-button" type="button" @onclick="() => OpenEntryAsync(entry)">
-                                        <div class="entry-icon">@(entry.IsDirectory ? "DIR" : "MD")</div>
-                                        <div class="entry-body">
-                                            <div class="entry-title-row">
-                                                <span class="entry-name">@((MarkupString)HighlightText(entry.Name))</span>
-                                                @if (entry.IsContentMatch)
-                                                {
-                                                    <span class="tiny-tag content-match">内容匹配</span>
-                                                }
-                                            </div>
+                        <Virtualize Items="_visibleEntries" Context="entry" ItemSize="82">
+                            <button class="@GetEntryButtonClass(entry)" type="button" @onclick="() => OpenEntryAsync(entry)">
+                                <span class="viewer-entry-kind">
+                                    <span class="@GetEntryKindTagClass(entry)">
+                                        @(entry.IsDirectory ? "DIR" : "MD")
+                                    </span>
+                                </span>
+                                <span class="viewer-entry-copy">
+                                    <span class="viewer-entry-headline">
+                                        <span class="viewer-entry-name">@((MarkupString)HighlightText(entry.Name))</span>
+                                        @if (entry.IsContentMatch)
+                                        {
+                                            <span class="tag is-warning is-light">内容匹配</span>
+                                        }
+                                    </span>
+                                    @if (_isSearchMode && !string.IsNullOrWhiteSpace(entry.DisplayPath))
+                                    {
+                                        <span class="viewer-entry-path">@entry.DisplayPath</span>
+                                    }
+                                    <span class="tags are-small mb-0 viewer-entry-meta">
+                                        @if (!entry.IsDirectory)
+                                        {
+                                            <span class="tag is-light">@FormatBytes(entry.Size)</span>
+                                        }
+                                        <span class="tag is-light">@entry.ModifiedAt.LocalDateTime.ToString("yyyy-MM-dd")</span>
+                                    </span>
+                                </span>
+                            </button>
+                        </Virtualize>
+                    }
+                </div>
+            </nav>
+        </aside>
 
-                                            @if (_isSearchMode && !string.IsNullOrWhiteSpace(entry.DisplayPath))
-                                            {
-                                                <div class="entry-path">@entry.DisplayPath</div>
-                                            }
+        <section class="viewer-main">
+            @if (_currentDocument is null)
+            {
+                <div class="box viewer-empty-box">
+                    <span class="tag is-primary is-light mb-4">阅读区</span>
+                    <h2 class="title is-3">选择一个 Markdown 文件开始查看</h2>
+                    <p class="subtitle is-5">
+                        左侧支持目录切换、路径导航和内容搜索。打开文档后，右侧会自动生成章节导航并渲染代码高亮。
+                    </p>
+                </div>
+            }
+            else
+            {
+                <div class="box viewer-document-box">
+                    <div class="level is-mobile is-flex-wrap-wrap viewer-document-meta">
+                        <div class="level-left">
+                            <div>
+                                <p class="is-size-7 has-text-weight-semibold has-text-link mb-2">@_currentDocument.SourceName</p>
+                                <h2 class="title is-3 mb-0">@_currentDocument.Name</h2>
+                            </div>
+                        </div>
+                        <div class="level-right">
+                            <div class="tags are-medium">
+                                <span class="tag is-link is-light">@FormatBytes(_currentDocument.Size)</span>
+                                <span class="tag is-light">@_currentDocument.ModifiedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</span>
+                            </div>
+                        </div>
+                    </div>
 
-                                            <div class="entry-meta">
-                                                @if (!entry.IsDirectory)
-                                                {
-                                                    <span class="tiny-tag">@FormatBytes(entry.Size)</span>
-                                                }
-                                                <span
-                                                class="tiny-tag">@entry.ModifiedAt.LocalDateTime.ToString("yyyy-MM-dd")</span>
-                                            </div>
-                                        </div>
+                    <article class="message is-primary is-light viewer-toc-message">
+                        <div class="message-body">
+                            <div class="level is-mobile is-flex-wrap-wrap mb-0">
+                                <div class="level-left">
+                                    <div>
+                                        <p class="is-size-7 has-text-weight-semibold has-text-link mb-2">章节导航</p>
+                                        <p class="title is-6 mb-0">@GetActiveHeadingTitle()</p>
+                                    </div>
+                                </div>
+                                <div class="level-right">
+                                    <button class="button is-small is-primary is-light" type="button" @onclick="ToggleToc">
+                                        @(_showToc ? "收起" : "展开")
                                     </button>
                                 </div>
-                            </Virtualize>
-                        </div>
-                    }
-                </section>
-            </aside>
-
-            <section class="viewer-content glass-panel">
-                @if (_currentDocument is null)
-                {
-                    <div class="empty-state content-empty">
-                        <span class="panel-kicker">阅读区</span>
-                        <h2>选择一个 Markdown 文件开始查看</h2>
-                        <p>左侧支持目录切换、路径导航和内容搜索。打开文档后，这里会自动生成章节导航和代码高亮。</p>
-                    </div>
-                }
-                else
-                {
-                    <div class="document-header">
-                        <div>
-                            <span class="panel-kicker">@_currentDocument.SourceName</span>
-                            <h2>@_currentDocument.Name</h2>
-                        </div>
-                        <div class="document-meta">
-                            <span class="tiny-tag">@FormatBytes(_currentDocument.Size)</span>
-                            <span class="tiny-tag">@_currentDocument.ModifiedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</span>
-                        </div>
-                    </div>
-
-                    <div class="toc-shell glass-panel">
-                        <button class="toc-toggle" type="button" @onclick="ToggleToc">
-                            <div>
-                                <span class="panel-kicker">章节导航</span>
-                                <strong>@GetActiveHeadingTitle()</strong>
                             </div>
-                            <span class="toc-toggle-icon">@(_showToc ? "收起" : "展开")</span>
-                        </button>
 
-                        @if (_showToc)
-                        {
-                            <div class="toc-list">
-                                @if (_headings.Count == 0)
-                                {
-                                    <div class="toc-empty">当前文档没有检测到二级及以上标题。</div>
-                                }
-                                else
-                                {
-                                    @foreach (var heading in _headings)
+                            @if (_showToc)
+                            {
+                                <div class="viewer-toc-list">
+                                    @if (_headings.Count == 0)
                                     {
-                                        <button class="@GetHeadingClass(heading)" type="button"
-                                                @onclick="() => ScrollToHeadingAsync(heading.Id)">
-                                            @heading.Text
-                                        </button>
+                                        <p class="has-text-grey mb-0">当前文档没有检测到二级及以上标题。</p>
                                     }
-                                }
-                            </div>
-                        }
-                    </div>
+                                    else
+                                    {
+                                        @foreach (var heading in _headings)
+                                        {
+                                            <button class="@GetHeadingClass(heading)" type="button" @onclick="() => ScrollToHeadingAsync(heading.Id)">
+                                                @heading.Text
+                                            </button>
+                                        }
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </article>
 
-                    <div class="markdown-scroll" @ref="_scrollElement">
-                        <article class="markdown-stage markdown-body" @ref="_markdownElement">
+                    <div class="viewer-markdown-scroll" @ref="_scrollElement">
+                        <article class="content markdown-body" @ref="_markdownElement">
                             @_renderedMarkdown
                         </article>
                     </div>
-                }
-            </section>
-        </div>
+                </div>
+            }
+        </section>
     </div>
+</div>
 
-<ConfigModal Visible="@_showConfigModal" Model="@_editingConfig" IsSaving="@_isSavingConfig" OnClose="CloseConfigModal"
+<ConfigModal Visible="@_showConfigModal"
+             Model="@_editingConfig"
+             IsSaving="@_isSavingConfig"
+             OnClose="CloseConfigModal"
              OnSave="SaveConfigAsync" />
 
 @code {
@@ -253,8 +292,7 @@
         if (_pendingMarkdownRefresh && _currentDocument is not null && _dotNetReference is not null)
         {
             _pendingMarkdownRefresh = false;
-            var headings = await JS.InvokeAsync<List<HeadingItem>>("mdViewerUi.refreshMarkdownView", _markdownElement,
-_scrollElement, _dotNetReference);
+            var headings = await JS.InvokeAsync<List<HeadingItem>>("mdViewerUi.refreshMarkdownView", _markdownElement, _scrollElement, _dotNetReference);
             _headings.Clear();
             _headings.AddRange(headings.Where(item => item.Level >= 2));
             _showToc = _headings.Count > 0 && _showToc;
@@ -460,8 +498,7 @@ _scrollElement, _dotNetReference);
             var savedConfig = await ApiClient.SaveConfigAsync(config);
             _config.Sources.Clear();
             _config.Sources.AddRange(savedConfig.Sources);
-            CurrentSource = _config.Sources.FirstOrDefault(source => source.Id == CurrentSource?.Id) ??
-_config.Sources.FirstOrDefault();
+            CurrentSource = _config.Sources.FirstOrDefault(source => source.Id == CurrentSource?.Id) ?? _config.Sources.FirstOrDefault();
             _showConfigModal = false;
 
             if (CurrentSource is not null)
@@ -573,16 +610,24 @@ _config.Sources.FirstOrDefault();
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     }
 
-    private string GetEntryClass(DirectoryEntryDto entry)
+    private string GetNoticeClass() =>
+        _noticeIsError ? "notification is-danger is-light viewer-notice" : "notification is-success is-light viewer-notice";
+
+    private string GetEntryButtonClass(DirectoryEntryDto entry)
     {
         var selected = _currentDocument?.RelativePath == entry.RelativePath;
-        return selected ? "entry-row active" : "entry-row";
+        return selected ? "panel-block viewer-entry is-active" : "panel-block viewer-entry";
     }
+
+    private static string GetEntryKindTagClass(DirectoryEntryDto entry) =>
+        entry.IsDirectory ? "tag is-link is-light" : "tag is-warning is-light";
 
     private string GetHeadingClass(HeadingItem heading)
     {
         var active = string.Equals(_activeHeadingId, heading.Id, StringComparison.Ordinal);
-        return active ? $"toc-item active level-{heading.Level}" : $"toc-item level-{heading.Level}";
+        return active
+            ? $"button is-fullwidth is-primary is-light viewer-toc-button level-{heading.Level} is-active"
+            : $"button is-fullwidth is-white viewer-toc-button level-{heading.Level}";
     }
 
     private string GetActiveHeadingTitle()

@@ -1,117 +1,176 @@
 @if (Visible)
 {
-    <div class="modal is-active config-modal-shell" @onclick="OnCloseRequested">
-        <div class="modal-background modal-backdrop"></div>
-        <div class="modal-card config-modal-card glass-panel" @onclick:stopPropagation="true">
-            <header class="config-modal-header">
+    <div class="modal is-active" @onclick="OnCloseRequested">
+        <div class="modal-background"></div>
+        <div class="modal-card viewer-modal-card" @onclick:stopPropagation="true">
+            <header class="modal-card-head">
                 <div>
-                    <span class="panel-kicker">系统配置</span>
-                    <h2>文档源管理</h2>
-                    <p>本地目录与 Git 仓库二选一保存，配置会写入服务器根目录的 <code>data/config.json</code>。</p>
+                    <p class="title is-4 mb-2">文档源管理</p>
+                    <p class="subtitle is-6 mb-0">本地目录与 Git 仓库二选一，配置会保存到 <code>data/config.json</code>。</p>
                 </div>
-                <button class="icon-button" type="button" @onclick="OnCloseRequested" aria-label="关闭配置">×</button>
+                <button class="delete" type="button" aria-label="关闭配置" @onclick="OnCloseRequested"></button>
             </header>
 
-            <section class="config-modal-body">
+            <section class="modal-card-body">
                 @if (Model.Sources.Count == 0)
                 {
-                    <div class="empty-state compact-empty">
-                        <h3>还没有文档源</h3>
-                        <p>先添加一个源，主界面的目录切换和文件浏览就会启用。</p>
-                    </div>
+                    <article class="message is-info is-light">
+                        <div class="message-body">
+                            还没有文档源。先添加一个源，主界面的目录切换和文件浏览就会启用。
+                        </div>
+                    </article>
                 }
 
                 @foreach (var source in Model.Sources)
                 {
-                    <section class="source-card" @key="source.Id">
-                        <div class="source-card-header">
-                            <div>
-                                <span class="source-badge">文档源</span>
-                                <h3>@(string.IsNullOrWhiteSpace(source.Name) ? "未命名文档源" : source.Name)</h3>
+                    <div class="card source-editor-card mb-5" @key="source.Id">
+                        <header class="card-header">
+                            <p class="card-header-title">
+                                @(string.IsNullOrWhiteSpace(source.Name) ? "未命名文档源" : source.Name)
+                            </p>
+                            <div class="card-header-icon">
+                                <span class="tag @(source.Kind == DocumentSourceKind.Local ? "is-link is-light" : "is-warning is-light")">
+                                    @(source.Kind == DocumentSourceKind.Local ? "本地路径" : "Git")
+                                </span>
                             </div>
-                            <button class="ghost-button danger" type="button" @onclick="() => RemoveSource(source.Id)">删除</button>
-                        </div>
+                        </header>
 
-                        <div class="field-grid two-columns">
-                            <label class="field-block">
-                                <span>源名称</span>
-                                <input class="input shell-input" @bind="source.Name" placeholder="例如：团队知识库" />
-                            </label>
-
-                            <label class="field-block">
-                                <span>数据来源方式</span>
-                                <div class="segmented-control">
-                                    <button class="@GetKindButtonClass(source, DocumentSourceKind.Local)" type="button" @onclick="() => SetKind(source, DocumentSourceKind.Local)">服务器本地路径</button>
-                                    <button class="@GetKindButtonClass(source, DocumentSourceKind.Git)" type="button" @onclick="() => SetKind(source, DocumentSourceKind.Git)">Git 仓库拉取</button>
-                                </div>
-                            </label>
-                        </div>
-
-                        @if (source.Kind == DocumentSourceKind.Local)
-                        {
-                            <label class="field-block">
-                                <span>服务器绝对路径</span>
-                                <input class="input shell-input" @bind="source.LocalPath" placeholder="例如：C:\Docs\Wiki 或 /home/docs/wiki" />
-                            </label>
-                        }
-                        else
-                        {
-                            <div class="field-grid two-columns">
-                                <label class="field-block">
-                                    <span>仓库地址</span>
-                                    <input class="input shell-input" @bind="source.GitRepositoryUrl" placeholder="https://github.com/example/repo.git" />
-                                </label>
-
-                                <label class="field-block">
-                                    <span>拉取间隔（分钟）</span>
-                                    <input class="input shell-input" type="number" min="1" step="1" @bind="source.PullIntervalMinutes" />
-                                </label>
+                        <div class="card-content">
+                            <div class="buttons is-right mb-4">
+                                <button class="button is-danger is-light is-small" type="button" @onclick="() => RemoveSource(source.Id)">
+                                    删除
+                                </button>
                             </div>
 
-                            <label class="field-block">
-                                <span>子目录路径</span>
-                                <input class="input shell-input" @bind="source.SubDirectory" placeholder="docs/api，留空表示整个仓库" />
-                            </label>
-
-                            <label class="field-block">
-                                <span>认证方式</span>
-                                <div class="segmented-control">
-                                    <button class="@GetAuthButtonClass(source, GitAuthMode.None)" type="button" @onclick="() => SetGitAuthMode(source, GitAuthMode.None)">无需认证</button>
-                                    <button class="@GetAuthButtonClass(source, GitAuthMode.UsernamePassword)" type="button" @onclick="() => SetGitAuthMode(source, GitAuthMode.UsernamePassword)">用户名密码</button>
-                                    <button class="@GetAuthButtonClass(source, GitAuthMode.Token)" type="button" @onclick="() => SetGitAuthMode(source, GitAuthMode.Token)">访问令牌</button>
+                            <div class="columns is-variable is-4 is-multiline">
+                                <div class="column is-half">
+                                    <div class="field">
+                                        <label class="label">源名称</label>
+                                        <div class="control">
+                                            <input class="input is-link" @bind="source.Name" placeholder="例如：团队知识库" />
+                                        </div>
+                                    </div>
                                 </div>
-                            </label>
 
-                            @if (source.GitAuthMode == GitAuthMode.UsernamePassword)
-                            {
-                                <div class="field-grid two-columns">
-                                    <label class="field-block">
-                                        <span>用户名</span>
-                                        <input class="input shell-input" @bind="source.GitUserName" placeholder="git-user" />
-                                    </label>
-                                    <label class="field-block">
-                                        <span>密码</span>
-                                        <input class="input shell-input" type="password" @bind="source.GitPassword" placeholder="请输入密码" />
-                                    </label>
+                                <div class="column is-half">
+                                    <div class="field">
+                                        <label class="label">数据来源方式</label>
+                                        <div class="buttons has-addons">
+                                            <button class="@GetKindButtonClass(source, DocumentSourceKind.Local)" type="button" @onclick="() => SetKind(source, DocumentSourceKind.Local)">
+                                                服务器本地路径
+                                            </button>
+                                            <button class="@GetKindButtonClass(source, DocumentSourceKind.Git)" type="button" @onclick="() => SetKind(source, DocumentSourceKind.Git)">
+                                                Git 仓库拉取
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            }
-                            else if (source.GitAuthMode == GitAuthMode.Token)
-                            {
-                                <label class="field-block">
-                                    <span>访问令牌</span>
-                                    <input class="input shell-input" type="password" @bind="source.GitToken" placeholder="PAT / Access Token" />
-                                </label>
-                            }
-                        }
-                    </section>
+
+                                @if (source.Kind == DocumentSourceKind.Local)
+                                {
+                                    <div class="column is-full">
+                                        <div class="field">
+                                            <label class="label">服务器绝对路径</label>
+                                            <div class="control">
+                                                <input class="input is-link" @bind="source.LocalPath" placeholder="例如：C:\Docs\Wiki 或 /home/docs/wiki" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="column is-half">
+                                        <div class="field">
+                                            <label class="label">仓库地址</label>
+                                            <div class="control">
+                                                <input class="input is-link" @bind="source.GitRepositoryUrl" placeholder="https://github.com/example/repo.git" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="column is-half">
+                                        <div class="field">
+                                            <label class="label">拉取间隔（分钟）</label>
+                                            <div class="control">
+                                                <input class="input is-link" type="number" min="1" step="1" @bind="source.PullIntervalMinutes" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="column is-full">
+                                        <div class="field">
+                                            <label class="label">子目录路径</label>
+                                            <div class="control">
+                                                <input class="input is-link" @bind="source.SubDirectory" placeholder="docs/api，留空表示整个仓库" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="column is-full">
+                                        <div class="field">
+                                            <label class="label">认证方式</label>
+                                            <div class="buttons has-addons">
+                                                <button class="@GetAuthButtonClass(source, GitAuthMode.None)" type="button" @onclick="() => SetGitAuthMode(source, GitAuthMode.None)">
+                                                    无需认证
+                                                </button>
+                                                <button class="@GetAuthButtonClass(source, GitAuthMode.UsernamePassword)" type="button" @onclick="() => SetGitAuthMode(source, GitAuthMode.UsernamePassword)">
+                                                    用户名密码
+                                                </button>
+                                                <button class="@GetAuthButtonClass(source, GitAuthMode.Token)" type="button" @onclick="() => SetGitAuthMode(source, GitAuthMode.Token)">
+                                                    访问令牌
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    @if (source.GitAuthMode == GitAuthMode.UsernamePassword)
+                                    {
+                                        <div class="column is-half">
+                                            <div class="field">
+                                                <label class="label">用户名</label>
+                                                <div class="control">
+                                                    <input class="input is-link" @bind="source.GitUserName" placeholder="git-user" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="column is-half">
+                                            <div class="field">
+                                                <label class="label">密码</label>
+                                                <div class="control">
+                                                    <input class="input is-link" type="password" @bind="source.GitPassword" placeholder="请输入密码" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                    else if (source.GitAuthMode == GitAuthMode.Token)
+                                    {
+                                        <div class="column is-full">
+                                            <div class="field">
+                                                <label class="label">访问令牌</label>
+                                                <div class="control">
+                                                    <input class="input is-link" type="password" @bind="source.GitToken" placeholder="PAT / Access Token" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                            </div>
+                        </div>
+                    </div>
                 }
 
-                <button class="accent-button wide-button" type="button" @onclick="AddSource">新增文档源</button>
+                <div class="buttons">
+                    <button class="button is-primary is-light" type="button" @onclick="AddSource">
+                        新增文档源
+                    </button>
+                </div>
             </section>
 
-            <footer class="config-modal-footer">
-                <button class="ghost-button" type="button" @onclick="OnCloseRequested">取消</button>
-                <button class="accent-button" type="button" disabled="@IsSaving" @onclick="SaveAsync">@(IsSaving ? "保存中..." : "保存配置")</button>
+            <footer class="modal-card-foot is-justify-content-flex-end">
+                <button class="button" type="button" @onclick="OnCloseRequested">取消</button>
+                <button class="button is-primary" type="button" disabled="@IsSaving" @onclick="SaveAsync">
+                    @(IsSaving ? "保存中..." : "保存配置")
+                </button>
             </footer>
         </div>
     </div>
@@ -194,11 +253,11 @@
         }
     }
 
-    private string GetKindButtonClass(DocumentSourceDto source, DocumentSourceKind kind) =>
-        source.Kind == kind ? "segment-button active" : "segment-button";
+    private static string GetKindButtonClass(DocumentSourceDto source, DocumentSourceKind kind) =>
+        source.Kind == kind ? "button is-link" : "button is-light";
 
-    private string GetAuthButtonClass(DocumentSourceDto source, GitAuthMode authMode) =>
-        source.GitAuthMode == authMode ? "segment-button active" : "segment-button";
+    private static string GetAuthButtonClass(DocumentSourceDto source, GitAuthMode authMode) =>
+        source.GitAuthMode == authMode ? "button is-link" : "button is-light";
 
     private Task OnCloseRequested() => OnClose.InvokeAsync();
 
