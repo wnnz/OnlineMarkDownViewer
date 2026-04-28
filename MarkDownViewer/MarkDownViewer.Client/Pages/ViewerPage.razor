@@ -1,0 +1,610 @@
+@page "/"
+@implements IAsyncDisposable
+@inject ApiClient ApiClient
+@inject ClientAuthService AuthService
+@inject MarkdownRendererService MarkdownRenderer
+@inject IJSRuntime JS
+
+<PageTitle>MD Viewer</PageTitle>
+
+<div class="viewer-shell">
+    <header class="viewer-header glass-panel">
+        <div class="brand-block">
+            <div class="brand-mark">MD</div>
+            <div>
+                <span class="panel-kicker">在线文档查看器</span>
+                <h1>MD Viewer</h1>
+            </div>
+        </div>
+
+        <div class="header-actions">
+            @if (CurrentSource is not null && CurrentSource.Kind == DocumentSourceKind.Git)
+            {
+                <button class="ghost-button" type="button" disabled="@_isSyncing" @onclick="SyncCurrentSourceAsync">@( _isSyncing ? "同步中..." : "立即同步")</button>
+            }
+            <button class="icon-button" type="button" @onclick="OpenConfigModal" aria-label="系统配置">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 8.6A3.4 3.4 0 1 0 12 15.4A3.4 3.4 0 1 0 12 8.6zM20.2 13.2V10.8L17.9 10C17.7 9.4 17.4 8.8 17.1 8.3L18.2 6.1L16.5 4.4L14.3 5.5C13.8 5.2 13.2 4.9 12.6 4.7L11.8 2.4H9.4L8.6 4.7C8 4.9 7.4 5.2 6.9 5.5L4.7 4.4L3 6.1L4.1 8.3C3.8 8.8 3.5 9.4 3.3 10L1 10.8V13.2L3.3 14C3.5 14.6 3.8 15.2 4.1 15.7L3 17.9L4.7 19.6L6.9 18.5C7.4 18.8 8 19.1 8.6 19.3L9.4 21.6H11.8L12.6 19.3C13.2 19.1 13.8 18.8 14.3 18.5L16.5 19.6L18.2 17.9L17.1 15.7C17.4 15.2 17.7 14.6 17.9 14L20.2 13.2Z" />
+                </svg>
+            </button>
+            <span class="user-chip">@AuthService.CurrentUserName</span>
+            <button class="ghost-button danger" type="button" @onclick="LogoutAsync">退出</button>
+        </div>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(_noticeMessage))
+    {
+        <div class="@($"notice-banner {(_noticeIsError ? "error" : "success")}")">@_noticeMessage</div>
+    }
+
+    <div class="viewer-body">
+        <aside class="viewer-sidebar glass-panel">
+            <section class="sidebar-section">
+                <span class="panel-kicker">文档源</span>
+                <label class="select shell-select">
+                    <select value="@SelectedSourceId" @onchange="OnSourceChangedAsync">
+                        <option value="">请选择文档源</option>
+                        @foreach (var source in _config.Sources)
+                        {
+                            <option value="@source.Id">@source.Name</option>
+                        }
+                    </select>
+                </label>
+            </section>
+
+            <section class="sidebar-section">
+                <span class="panel-kicker">快速搜索</span>
+                <input class="input shell-input" value="@_searchText" @oninput="OnSearchChangedAsync" placeholder="按文件名或内容搜索..." />
+            </section>
+
+            <section class="sidebar-section">
+                <span class="panel-kicker">当前位置</span>
+                <nav class="breadcrumb-shell" aria-label="文档路径">
+                    @if (_currentDirectory is null)
+                    {
+                        <span class="breadcrumb-pill muted">根目录</span>
+                    }
+                    else
+                    {
+                        @foreach (var crumb in _currentDirectory.Breadcrumbs)
+                        {
+                            <button class="breadcrumb-pill" type="button" @onclick="() => NavigateToDirectoryAsync(crumb.RelativePath)">@crumb.Name</button>
+                        }
+                    }
+                </nav>
+            </section>
+
+            <section class="sidebar-section flex-fill">
+                <div class="section-title-row">
+                    <span class="panel-kicker">@(_isSearchMode ? "搜索结果" : "文件列表")</span>
+                    @if (_isLoadingEntries)
+                    {
+                        <span class="tiny-tag">刷新中</span>
+                    }
+                </div>
+
+                @if (!_config.Sources.Any())
+                {
+                    <div class="empty-state compact-empty">
+                        <h3>还没有配置文档源</h3>
+                        <p>打开右上角配置面板，新增本地目录或 Git 仓库后就能开始浏览。</p>
+                    </div>
+                }
+                else if (_visibleEntries.Count == 0)
+                {
+                    <div class="empty-state compact-empty">
+                        <h3>@(_isSearchMode ? "没有找到匹配结果" : "这个目录是空的")</h3>
+                        <p>@(_isSearchMode ? "试试更短的关键词，或者切换另一个文档源。" : "可以切换路径、切换文档源，或者通过配置面板添加更多来源。")</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="entry-list-shell">
+                        <Virtualize Items="_visibleEntries" Context="entry" ItemSize="74">
+                            <div class="@GetEntryClass(entry)">
+                                <button class="entry-button" type="button" @onclick="() => OpenEntryAsync(entry)">
+                                    <div class="entry-icon">@(entry.IsDirectory ? "DIR" : "MD")</div>
+                                    <div class="entry-body">
+                                        <div class="entry-title-row">
+                                            <span class="entry-name">@((MarkupString)HighlightText(entry.Name))</span>
+                                            @if (entry.IsContentMatch)
+                                            {
+                                                <span class="tiny-tag content-match">内容匹配</span>
+                                            }
+                                        </div>
+
+                                        @if (_isSearchMode && !string.IsNullOrWhiteSpace(entry.DisplayPath))
+                                        {
+                                            <div class="entry-path">@entry.DisplayPath</div>
+                                        }
+
+                                        <div class="entry-meta">
+                                            @if (!entry.IsDirectory)
+                                            {
+                                                <span class="tiny-tag">@FormatBytes(entry.Size)</span>
+                                            }
+                                            <span class="tiny-tag">@entry.ModifiedAt.LocalDateTime.ToString("yyyy-MM-dd")</span>
+                                        </div>
+                                    </div>
+                                </button>
+                            </div>
+                        </Virtualize>
+                    </div>
+                }
+            </section>
+        </aside>
+
+        <section class="viewer-content glass-panel">
+            @if (_currentDocument is null)
+            {
+                <div class="empty-state content-empty">
+                    <span class="panel-kicker">阅读区</span>
+                    <h2>选择一个 Markdown 文件开始查看</h2>
+                    <p>左侧支持目录切换、路径导航和内容搜索。打开文档后，这里会自动生成章节导航和代码高亮。</p>
+                </div>
+            }
+            else
+            {
+                <div class="document-header">
+                    <div>
+                        <span class="panel-kicker">@_currentDocument.SourceName</span>
+                        <h2>@_currentDocument.Name</h2>
+                    </div>
+                    <div class="document-meta">
+                        <span class="tiny-tag">@FormatBytes(_currentDocument.Size)</span>
+                        <span class="tiny-tag">@_currentDocument.ModifiedAt.LocalDateTime.ToString("yyyy-MM-dd HH:mm")</span>
+                    </div>
+                </div>
+
+                <div class="toc-shell glass-panel">
+                    <button class="toc-toggle" type="button" @onclick="ToggleToc">
+                        <div>
+                            <span class="panel-kicker">章节导航</span>
+                            <strong>@GetActiveHeadingTitle()</strong>
+                        </div>
+                        <span class="toc-toggle-icon">@(_showToc ? "收起" : "展开")</span>
+                    </button>
+
+                    @if (_showToc)
+                    {
+                        <div class="toc-list">
+                            @if (_headings.Count == 0)
+                            {
+                                <div class="toc-empty">当前文档没有检测到二级及以上标题。</div>
+                            }
+                            else
+                            {
+                                @foreach (var heading in _headings)
+                                {
+                                    <button class="@GetHeadingClass(heading)" type="button" @onclick="() => ScrollToHeadingAsync(heading.Id)">
+                                        @heading.Text
+                                    </button>
+                                }
+                            }
+                        </div>
+                    }
+                </div>
+
+                <div class="markdown-scroll" @ref="_scrollElement">
+                    <article class="markdown-stage markdown-body" @ref="_markdownElement">
+                        @_renderedMarkdown
+                    </article>
+                </div>
+            }
+        </section>
+    </div>
+</div>
+
+<ConfigModal Visible="@_showConfigModal"
+             Model="@_editingConfig"
+             IsSaving="@_isSavingConfig"
+             OnClose="CloseConfigModal"
+             OnSave="SaveConfigAsync" />
+
+@code {
+    private static readonly JsonSerializerOptions CloneOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters =
+        {
+            new System.Text.Json.Serialization.JsonStringEnumConverter()
+        }
+    };
+
+    private readonly AppConfigDto _config = new();
+    private AppConfigDto _editingConfig = new();
+    private readonly List<HeadingItem> _headings = [];
+    private readonly List<DirectoryEntryDto> _visibleEntries = [];
+    private ElementReference _markdownElement;
+    private ElementReference _scrollElement;
+    private DotNetObjectReference<ViewerPage>? _dotNetReference;
+    private CancellationTokenSource? _searchCancellationSource;
+    private DirectoryBrowseResponse? _currentDirectory;
+    private MarkdownDocumentDto? _currentDocument;
+    private MarkupString _renderedMarkdown;
+    private DocumentSourceDto? CurrentSource { get; set; }
+    private string SelectedSourceId => CurrentSource?.Id ?? string.Empty;
+    private string _searchText = string.Empty;
+    private string _activeHeadingId = string.Empty;
+    private string _noticeMessage = string.Empty;
+    private bool _noticeIsError;
+    private bool _isSearchMode;
+    private bool _isLoadingEntries;
+    private bool _isSavingConfig;
+    private bool _isSyncing;
+    private bool _showConfigModal;
+    private bool _showToc;
+    private bool _pendingMarkdownRefresh;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadConfigAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetReference = DotNetObjectReference.Create(this);
+        }
+
+        if (_pendingMarkdownRefresh && _currentDocument is not null && _dotNetReference is not null)
+        {
+            _pendingMarkdownRefresh = false;
+            var headings = await JS.InvokeAsync<List<HeadingItem>>("mdViewerUi.refreshMarkdownView", _markdownElement, _scrollElement, _dotNetReference);
+            _headings.Clear();
+            _headings.AddRange(headings.Where(item => item.Level >= 2));
+            _showToc = _headings.Count > 0 && _showToc;
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public Task SetActiveHeading(string headingId)
+    {
+        _activeHeadingId = headingId;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private async Task LoadConfigAsync()
+    {
+        await RunGuardedAsync(async () =>
+        {
+            var config = await ApiClient.GetConfigAsync();
+            _config.Sources.Clear();
+            _config.Sources.AddRange(config.Sources);
+
+            if (CurrentSource is null || _config.Sources.All(source => source.Id != CurrentSource.Id))
+            {
+                CurrentSource = _config.Sources.FirstOrDefault();
+            }
+            else
+            {
+                CurrentSource = _config.Sources.First(source => source.Id == CurrentSource.Id);
+            }
+
+            if (CurrentSource is not null)
+            {
+                await LoadDirectoryAsync(CurrentSource.Id, _currentDirectory?.CurrentPath);
+            }
+            else
+            {
+                _currentDirectory = null;
+                _visibleEntries.Clear();
+                _currentDocument = null;
+                _renderedMarkdown = default;
+            }
+        }, "加载配置失败");
+    }
+
+    private async Task OnSourceChangedAsync(ChangeEventArgs args)
+    {
+        var sourceId = args.Value?.ToString();
+        CurrentSource = _config.Sources.FirstOrDefault(source => source.Id == sourceId);
+        _searchText = string.Empty;
+        _isSearchMode = false;
+        _currentDocument = null;
+        _headings.Clear();
+        _visibleEntries.Clear();
+        _renderedMarkdown = default;
+
+        if (CurrentSource is not null)
+        {
+            await LoadDirectoryAsync(CurrentSource.Id, string.Empty);
+        }
+    }
+
+    private async Task LoadDirectoryAsync(string sourceId, string? path)
+    {
+        _isLoadingEntries = true;
+        StateHasChanged();
+
+        await RunGuardedAsync(async () =>
+        {
+            _currentDirectory = await ApiClient.BrowseAsync(sourceId, path);
+            _visibleEntries.Clear();
+            _visibleEntries.AddRange(_currentDirectory.Entries);
+            _isSearchMode = false;
+        }, "读取目录失败");
+
+        _isLoadingEntries = false;
+        StateHasChanged();
+    }
+
+    private async Task OnSearchChangedAsync(ChangeEventArgs args)
+    {
+        _searchText = args.Value?.ToString() ?? string.Empty;
+        _searchCancellationSource?.Cancel();
+        _searchCancellationSource?.Dispose();
+        _searchCancellationSource = new CancellationTokenSource();
+        var cancellationToken = _searchCancellationSource.Token;
+
+        if (CurrentSource is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_searchText))
+        {
+            await LoadDirectoryAsync(CurrentSource.Id, _currentDirectory?.CurrentPath);
+            return;
+        }
+
+        _isLoadingEntries = true;
+        StateHasChanged();
+
+        try
+        {
+            await Task.Delay(220, cancellationToken);
+            var results = await ApiClient.SearchAsync(CurrentSource.Id, _searchText, cancellationToken);
+            _visibleEntries.Clear();
+            _visibleEntries.AddRange(results);
+            _isSearchMode = true;
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            await AuthService.LogoutAndRedirectAsync();
+            return;
+        }
+        catch (Exception exception)
+        {
+            ShowNotice($"搜索失败：{exception.Message}", true);
+        }
+        finally
+        {
+            _isLoadingEntries = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenEntryAsync(DirectoryEntryDto entry)
+    {
+        if (CurrentSource is null)
+        {
+            return;
+        }
+
+        if (entry.IsDirectory)
+        {
+            await LoadDirectoryAsync(CurrentSource.Id, entry.RelativePath);
+            return;
+        }
+
+        await OpenDocumentAsync(CurrentSource.Id, entry.RelativePath);
+    }
+
+    private async Task OpenDocumentAsync(string sourceId, string relativePath)
+    {
+        await RunGuardedAsync(async () =>
+        {
+            _currentDocument = await ApiClient.GetDocumentAsync(sourceId, relativePath);
+            _renderedMarkdown = MarkdownRenderer.Render(_currentDocument.Content);
+            _pendingMarkdownRefresh = true;
+            _showToc = true;
+
+            var parentPath = GetParentPath(relativePath);
+            if (CurrentSource is not null && (!_isSearchMode || _currentDirectory?.CurrentPath != parentPath))
+            {
+                _currentDirectory = await ApiClient.BrowseAsync(sourceId, parentPath);
+            }
+
+            _visibleEntries.Clear();
+            if (_isSearchMode)
+            {
+                var results = await ApiClient.SearchAsync(sourceId, _searchText);
+                _visibleEntries.AddRange(results);
+            }
+            else if (_currentDirectory is not null)
+            {
+                _visibleEntries.AddRange(_currentDirectory.Entries);
+            }
+        }, "打开文档失败");
+    }
+
+    private async Task NavigateToDirectoryAsync(string relativePath)
+    {
+        if (CurrentSource is not null)
+        {
+            _searchText = string.Empty;
+            await LoadDirectoryAsync(CurrentSource.Id, relativePath);
+        }
+    }
+
+    private void OpenConfigModal()
+    {
+        _editingConfig = CloneConfig(_config);
+        _showConfigModal = true;
+    }
+
+    private Task CloseConfigModal()
+    {
+        _showConfigModal = false;
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveConfigAsync(AppConfigDto config)
+    {
+        _isSavingConfig = true;
+        StateHasChanged();
+
+        await RunGuardedAsync(async () =>
+        {
+            var savedConfig = await ApiClient.SaveConfigAsync(config);
+            _config.Sources.Clear();
+            _config.Sources.AddRange(savedConfig.Sources);
+            CurrentSource = _config.Sources.FirstOrDefault(source => source.Id == CurrentSource?.Id) ?? _config.Sources.FirstOrDefault();
+            _showConfigModal = false;
+
+            if (CurrentSource is not null)
+            {
+                await LoadDirectoryAsync(CurrentSource.Id, string.Empty);
+            }
+            else
+            {
+                _currentDirectory = null;
+                _currentDocument = null;
+                _visibleEntries.Clear();
+            }
+
+            ShowNotice("配置已保存。", false);
+        }, "保存配置失败");
+
+        _isSavingConfig = false;
+        StateHasChanged();
+    }
+
+    private async Task SyncCurrentSourceAsync()
+    {
+        if (CurrentSource is null)
+        {
+            return;
+        }
+
+        _isSyncing = true;
+        StateHasChanged();
+
+        await RunGuardedAsync(async () =>
+        {
+            var result = await ApiClient.SyncAsync(CurrentSource.Id);
+            await LoadDirectoryAsync(CurrentSource.Id, _currentDirectory?.CurrentPath);
+            ShowNotice(result.Message, !result.Success);
+        }, "手动同步失败");
+
+        _isSyncing = false;
+        StateHasChanged();
+    }
+
+    private async Task LogoutAsync() =>
+        await AuthService.LogoutAndRedirectAsync();
+
+    private async Task ScrollToHeadingAsync(string headingId)
+    {
+        _showToc = false;
+        await JS.InvokeVoidAsync("mdViewerUi.scrollToHeading", _scrollElement, headingId);
+    }
+
+    private void ToggleToc() => _showToc = !_showToc;
+
+    private async Task RunGuardedAsync(Func<Task> action, string title)
+    {
+        try
+        {
+            await action();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            await AuthService.LogoutAndRedirectAsync();
+        }
+        catch (Exception exception)
+        {
+            ShowNotice($"{title}：{exception.Message}", true);
+        }
+    }
+
+    private void ShowNotice(string message, bool isError)
+    {
+        _noticeMessage = message;
+        _noticeIsError = isError;
+    }
+
+    private static AppConfigDto CloneConfig(AppConfigDto config)
+    {
+        var json = JsonSerializer.Serialize(config, CloneOptions);
+        return JsonSerializer.Deserialize<AppConfigDto>(json, CloneOptions) ?? new AppConfigDto();
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024)
+        {
+            return $"{bytes} B";
+        }
+
+        var value = bytes / 1024d;
+        if (value < 1024)
+        {
+            return $"{value:F1} KB";
+        }
+
+        return $"{value / 1024d:F1} MB";
+    }
+
+    private string HighlightText(string text)
+    {
+        var encoded = System.Net.WebUtility.HtmlEncode(text);
+        if (string.IsNullOrWhiteSpace(_searchText))
+        {
+            return encoded;
+        }
+
+        return System.Text.RegularExpressions.Regex.Replace(
+            encoded,
+            System.Text.RegularExpressions.Regex.Escape(_searchText),
+            match => $"<mark>{match.Value}</mark>",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    }
+
+    private string GetEntryClass(DirectoryEntryDto entry)
+    {
+        var selected = _currentDocument?.RelativePath == entry.RelativePath;
+        return selected ? "entry-row active" : "entry-row";
+    }
+
+    private string GetHeadingClass(HeadingItem heading)
+    {
+        var active = string.Equals(_activeHeadingId, heading.Id, StringComparison.Ordinal);
+        return active ? $"toc-item active level-{heading.Level}" : $"toc-item level-{heading.Level}";
+    }
+
+    private string GetActiveHeadingTitle()
+    {
+        var currentHeading = _headings.FirstOrDefault(item => item.Id == _activeHeadingId);
+        return currentHeading?.Text ?? "浏览文档结构";
+    }
+
+    private static string GetParentPath(string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath) || !relativePath.Contains('/'))
+        {
+            return string.Empty;
+        }
+
+        return relativePath[..relativePath.LastIndexOf('/')];
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _searchCancellationSource?.Cancel();
+        _searchCancellationSource?.Dispose();
+
+        if (_dotNetReference is not null)
+        {
+            await JS.InvokeVoidAsync("mdViewerUi.disposeMarkdownView", _scrollElement);
+            _dotNetReference.Dispose();
+        }
+    }
+}

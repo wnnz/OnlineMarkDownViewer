@@ -1,0 +1,57 @@
+@inject ClientAuthService AuthService
+@inject IJSRuntime JS
+
+@if (!_isReady)
+{
+    <div class="boot-screen">
+        <div class="boot-card glass-panel">
+            <span class="boot-kicker">MD Viewer</span>
+            <h1>正在准备文档工作台</h1>
+            <p>认证校验与界面资源正在就绪，请稍候。</p>
+        </div>
+    </div>
+}
+else if (_isAuthenticated)
+{
+    <Router AppAssembly="@typeof(Program).Assembly">
+        <Found Context="routeData">
+            <RouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)" />
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+        <NotFound>
+            <LayoutView Layout="@typeof(Layout.MainLayout)">
+                <div class="boot-screen">
+                    <div class="boot-card glass-panel">
+                        <span class="boot-kicker">404</span>
+                        <h1>页面不存在</h1>
+                        <p>这个入口没有找到，我们回到文档首页继续。</p>
+                    </div>
+                </div>
+            </LayoutView>
+        </NotFound>
+    </Router>
+}
+
+@code {
+    private bool _isReady;
+    private bool _isAuthenticated;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        _isAuthenticated = await AuthService.InitializeAsync();
+        _isReady = true;
+
+        if (!_isAuthenticated)
+        {
+            await JS.InvokeVoidAsync("mdViewerAuth.redirectToLogin");
+            return;
+        }
+
+        StateHasChanged();
+    }
+}

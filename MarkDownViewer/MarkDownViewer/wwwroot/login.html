@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MD Viewer 登录</title>
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="preload" href="/_framework/blazor.webassembly.js" as="script" />
+    <link rel="stylesheet" href="/app.css" />
+    <link rel="stylesheet" href="/login.css" />
+</head>
+<body>
+    <div class="login-page">
+        <div class="login-orb login-orb-left"></div>
+        <div class="login-orb login-orb-right"></div>
+
+        <main class="login-card glass-panel">
+            <div class="login-brand">
+                <span class="panel-kicker">Online Markdown Viewer</span>
+                <h1>MD Viewer</h1>
+                <p>登录后进入毛玻璃文档工作台，支持多源 Markdown 浏览、全文检索和代码高亮。</p>
+            </div>
+
+            <form id="login-form" class="login-form">
+                <label class="field-block">
+                    <span>用户名</span>
+                    <input id="username" class="input shell-input" name="username" autocomplete="username" placeholder="admin" required />
+                </label>
+
+                <label class="field-block">
+                    <span>密码</span>
+                    <input id="password" class="input shell-input" type="password" name="password" autocomplete="current-password" placeholder="admin123" required />
+                </label>
+
+                <div class="login-footnote">
+                    演示账号：<code>admin</code> / <code>admin123</code>
+                </div>
+
+                <button id="login-button" class="accent-button login-submit" type="submit">登录并进入系统</button>
+                <p id="login-message" class="login-message" aria-live="polite"></p>
+            </form>
+        </main>
+    </div>
+
+    <script src="/js/login.js"></script>
+</body>
+</html>
