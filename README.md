@@ -41,14 +41,6 @@ http://localhost:5114/login.html
 1. 在 `MarkDownViewer/MarkDownViewer/data/default-docs/` 下生成示例 Markdown 文档
 2. 在 `MarkDownViewer/MarkDownViewer/data/config.json` 中写入一个默认本地文档源
 
-默认文档源名称为：
-
-```text
-默认文档源
-```
-
-如果你后续手工删除全部文档源，系统不会反复强制恢复默认源。
-
 ## 示例文档内容
 
 默认示例文档源中包含：
@@ -68,19 +60,3 @@ http://localhost:5114/login.html
 - 章节导航
 - 代码高亮
 - 表格与引用样式
-
-## 关键目录
-
-```text
-MarkDownViewer/
-├─ MarkDownViewer/                 # ASP.NET Core 宿主与 API
-│  ├─ data/                        # 配置与默认示例文档
-│  └─ wwwroot/login.html           # 静态登录页
-└─ MarkDownViewer.Client/          # Blazor WASM 前端
-```
-
-## 当前说明
-
-- 登录页预热逻辑已适配当前 `.NET 10` 的 `_framework` 输出，不依赖 `blazor.boot.json`
-- Git 文档源已支持 clone / pull / 定时同步
-- 更完整的稀疏检出能力仍可继续增强
